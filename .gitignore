@@ -1,0 +1,31 @@
+# STM32CubeIDE
+Debug/
+Release/
+.settings/
+*.launch
+.cproject
+.project
+
+# Build artifacts
+*.o
+*.d
+*.su
+*.elf
+*.bin
+*.hex
+*.map
+*.list
+
+# Generated files
+*.log
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# User-specific files (optional - uncomment if you want to share these)
+# .mxproject
+
+# Documentation generated
+html/
+latex/
