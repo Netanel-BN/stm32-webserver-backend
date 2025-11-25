@@ -48,6 +48,13 @@ uint8_t rx_buffer[RX_BUFFER_SIZE];
 uint8_t rx_data;
 uint16_t rx_index = 0;
 
+// Debug counters - visible in debugger
+volatile uint32_t uart_rx_count = 0;      // Total bytes received
+volatile uint32_t uart_tx_count = 0;      // Total bytes sent
+volatile uint32_t uart_cmd_count = 0;     // Commands processed
+volatile uint32_t uart_error_count = 0;   // Errors detected
+volatile uint8_t last_rx_byte = 0;        // Last received byte
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -453,12 +460,16 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
   if (huart->Instance == USART1)
   {
+    uart_rx_count++;           // Increment receive counter
+    last_rx_byte = rx_data;    // Store last received byte
+    
     // Check for newline or carriage return (end of command)
     if (rx_data == '\n' || rx_data == '\r')
     {
       if (rx_index > 0)  // Only process if we have data
       {
         rx_buffer[rx_index] = '\0';  // Null terminate the string
+        uart_cmd_count++;  // Increment command counter
         process_uart_command(rx_buffer, rx_index);
         rx_index = 0;  // Reset buffer index
       }
@@ -471,6 +482,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     else
     {
       // Buffer overflow - reset
+      uart_error_count++;
       rx_index = 0;
       char *error = "Buffer overflow!\r\n";
       HAL_UART_Transmit(&huart1, (uint8_t*)error, strlen(error), HAL_MAX_DELAY);
@@ -509,6 +521,7 @@ static void process_uart_command(uint8_t *buffer, uint16_t length)
   
   // Send response
   HAL_UART_Transmit(&huart1, (uint8_t*)response, strlen(response), HAL_MAX_DELAY);
+  uart_tx_count++;  // Increment transmit counter
 }
 
 /* USER CODE END 4 */
