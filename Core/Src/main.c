@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -43,6 +43,10 @@
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
+#define RX_BUFFER_SIZE 256
+uint8_t rx_buffer[RX_BUFFER_SIZE];
+uint8_t rx_data;
+uint16_t rx_index = 0;
 
 /* USER CODE END PV */
 
@@ -51,7 +55,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
-
+static void process_uart_command(uint8_t *buffer, uint16_t length);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -90,7 +94,12 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  // Start UART reception in interrupt mode
+  HAL_UART_Receive_IT(&huart1, &rx_data, 1);
+  
+  // Send welcome message
+  char *welcome = "STM32 UART Ready\r\n";
+  HAL_UART_Transmit(&huart1, (uint8_t*)welcome, strlen(welcome), HAL_MAX_DELAY);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -439,6 +448,68 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+// UART Receive Complete Callback - called when one byte is received
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  if (huart->Instance == USART1)
+  {
+    // Check for newline or carriage return (end of command)
+    if (rx_data == '\n' || rx_data == '\r')
+    {
+      if (rx_index > 0)  // Only process if we have data
+      {
+        rx_buffer[rx_index] = '\0';  // Null terminate the string
+        process_uart_command(rx_buffer, rx_index);
+        rx_index = 0;  // Reset buffer index
+      }
+    }
+    else if (rx_index < RX_BUFFER_SIZE - 1)
+    {
+      // Store received character in buffer
+      rx_buffer[rx_index++] = rx_data;
+    }
+    else
+    {
+      // Buffer overflow - reset
+      rx_index = 0;
+      char *error = "Buffer overflow!\r\n";
+      HAL_UART_Transmit(&huart1, (uint8_t*)error, strlen(error), HAL_MAX_DELAY);
+    }
+    
+    // Re-enable UART interrupt for next byte
+    HAL_UART_Receive_IT(&huart1, &rx_data, 1);
+  }
+}
+
+// Process received UART commands
+static void process_uart_command(uint8_t *buffer, uint16_t length)
+{
+  char response[128];
+  
+  // Example: Echo the received command
+  if (strncmp((char*)buffer, "LED_ON", 6) == 0)
+  {
+    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+    sprintf(response, "LED turned ON\r\n");
+  }
+  else if (strncmp((char*)buffer, "LED_OFF", 7) == 0)
+  {
+    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+    sprintf(response, "LED turned OFF\r\n");
+  }
+  else if (strncmp((char*)buffer, "STATUS", 6) == 0)
+  {
+    sprintf(response, "System OK - Uptime: %lu ms\r\n", HAL_GetTick());
+  }
+  else
+  {
+    // Echo back the received command
+    sprintf(response, "Received: %s\r\n", buffer);
+  }
+  
+  // Send response
+  HAL_UART_Transmit(&huart1, (uint8_t*)response, strlen(response), HAL_MAX_DELAY);
+}
 
 /* USER CODE END 4 */
 
