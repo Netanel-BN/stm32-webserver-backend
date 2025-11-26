@@ -471,6 +471,9 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
 {
   if (huart->Instance == USART1)
   {
+    // Toggle LED to show callback is triggered
+    HAL_GPIO_TogglePin(LD4_GPIO_Port, LD4_Pin);
+    
     process_uart_command(rx_buffer, size);
     
     // Clear buffer before reuse
@@ -546,6 +549,34 @@ static void process_uart_command(uint8_t *buffer, uint16_t length)
   else
   {
     uart_error_count++;  // Track transmission errors
+  }
+}
+
+// UART Transmit Complete Callback
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+  if (huart->Instance == USART1)
+  {
+    tx_busy = 0;
+    uart_tx_count++;  // Increment transmit counter
+  }
+}
+
+// UART Error Callback - handles errors and restarts reception
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+  if (huart->Instance == USART1)
+  {
+    uart_error_count++;
+    
+    // Clear error flags
+    __HAL_UART_CLEAR_OREFLAG(huart);
+    __HAL_UART_CLEAR_NEFLAG(huart);
+    __HAL_UART_CLEAR_FEFLAG(huart);
+    
+    // Restart reception
+    memset(rx_buffer, 0, RX_BUFFER_SIZE);
+    subscribe_to_idle();
   }
 }
 
