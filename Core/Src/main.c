@@ -19,12 +19,9 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
-#include <string.h>
-#include <stdio.h>
-
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "I2C_SLAVE.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -35,6 +32,8 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+#define RX_BUFFER_SIZE 64
+#define TX_BUFFER_SIZE 128
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -43,17 +42,19 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+I2C_HandleTypeDef hi2c3;
+
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-#define RX_BUFFER_SIZE 64
-#define TX_BUFFER_SIZE 128
 
+/*
+ * UART
+ */
 uint8_t rx_buffer[RX_BUFFER_SIZE];    // Main receive buffer
 uint8_t tx_buffer[TX_BUFFER_SIZE];    // Transmit buffer
 uint16_t rx_index = 0;
 volatile uint8_t tx_busy = 0;         // Flag to track if transmission is ongoing
-
 // Debug counters - visible in debugger
 volatile uint32_t uart_rx_count = 0;      // Total bytes received
 volatile uint32_t uart_tx_count = 0;      // Total bytes sent
@@ -67,6 +68,7 @@ volatile uint16_t last_rx_length = 0;     // Last received chunk length
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_I2C3_Init(void);
 /* USER CODE BEGIN PFP */
 static void process_uart_command(uint8_t *buffer, uint16_t length);
 static void subscribe_to_idle(void);
@@ -107,10 +109,13 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART1_UART_Init();
+  MX_I2C3_Init();
   /* USER CODE BEGIN 2 */
   // Enable UART Idle Line Interrupt
   __HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
-  
+  //Enable i2c slave listen interrupt
+
+  i2c_slave_init(&hi2c3);
   // Start UART reception in interrupt mode - receive up to RX_BUFFER_SIZE bytes
   subscribe_to_idle();
   
@@ -176,6 +181,54 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief I2C3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C3_Init(void)
+{
+
+  /* USER CODE BEGIN I2C3_Init 0 */
+
+  /* USER CODE END I2C3_Init 0 */
+
+  /* USER CODE BEGIN I2C3_Init 1 */
+
+  /* USER CODE END I2C3_Init 1 */
+  hi2c3.Instance = I2C3;
+  hi2c3.Init.ClockSpeed = 100000;
+  hi2c3.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c3.Init.OwnAddress1 = 80;
+  hi2c3.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c3.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c3.Init.OwnAddress2 = 0;
+  hi2c3.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c3.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c3, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c3, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C3_Init 2 */
+
+  /* USER CODE END I2C3_Init 2 */
+
 }
 
 /**
@@ -413,22 +466,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF14_LTDC;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : I2C3_SDA_Pin */
-  GPIO_InitStruct.Pin = I2C3_SDA_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  GPIO_InitStruct.Alternate = GPIO_AF4_I2C3;
-  HAL_GPIO_Init(I2C3_SDA_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : I2C3_SCL_Pin */
-  GPIO_InitStruct.Pin = I2C3_SCL_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  GPIO_InitStruct.Alternate = GPIO_AF4_I2C3;
-  HAL_GPIO_Init(I2C3_SCL_GPIO_Port, &GPIO_InitStruct);
-
   /*Configure GPIO pins : G7_Pin B2_Pin */
   GPIO_InitStruct.Pin = G7_Pin|B2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
@@ -549,16 +586,6 @@ static void process_uart_command(uint8_t *buffer, uint16_t length)
   else
   {
     uart_error_count++;  // Track transmission errors
-  }
-}
-
-// UART Transmit Complete Callback
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
-{
-  if (huart->Instance == USART1)
-  {
-    tx_busy = 0;
-    uart_tx_count++;  // Increment transmit counter
   }
 }
 
