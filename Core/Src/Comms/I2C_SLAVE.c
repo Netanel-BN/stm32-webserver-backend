@@ -6,7 +6,7 @@
  */
 
 
-#include "I2C_SLAVE.h"
+#include "Comms/I2C_SLAVE.h"
 
 #include <string.h>
 #include <stdio.h>

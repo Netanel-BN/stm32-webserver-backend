@@ -21,8 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "UART_LIB.h"
-#include "I2C_SLAVE.h"
+#include "Comms/UART_LIB.h"
+#include "Comms/I2C_SLAVE.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
